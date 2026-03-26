@@ -4,7 +4,9 @@
     <meta charset="utf-8" />
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #1a1a1a; color: white; }
+        /* ★ 核心修复：加入了 width: 100vw; height: 100vh; 撑开画布 */
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #1a1a1a; color: white; width: 100vw; height: 100vh; }
+        
         .ui-panel { position: absolute; top: 20px; left: 20px; background: rgba(30, 30, 30, 0.95); padding: 15px; border-radius: 8px; width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #444; max-height: 85vh; overflow-y: auto; pointer-events: auto; }
         .ui-panel h2 { margin: 0 0 10px 0; font-size: 16px; color: #4db8ff; border-bottom: 1px solid #444; padding-bottom: 5px; }
         .ui-panel h3 { margin: 15px 0 5px 0; font-size: 13px; color: #aaa; border-bottom: 1px dashed #555; padding-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
@@ -36,36 +38,56 @@
     </style>
 </head>
 <body>
+    <script>
+        function applyLocalLang() {
+            const lang = localStorage.getItem('lang') || 'cn';
+            document.querySelectorAll('[data-cn]').forEach(el => {
+                el.innerText = el.getAttribute('data-' + lang);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', applyLocalLang);
+    </script>
+
     <div class="ui-panel">
-        <h2>🗺️ Channel Map 2D</h2>
-        <h3>Base Map</h3>
+        <h2 data-cn="🗺️ 2D 通道拓扑图" data-en="🗺️ Channel Map 2D">🗺️ 2D 通道拓扑图</h2>
+        
+        <h3 data-cn="基础地图" data-en="Base Map">基础地图</h3>
         <select id="map-selector" onchange="loadPreset(this.value)">
-            <option value="preset_49ch.json">49 Channels (Standard)</option>
-            <option value="preset_45ch.json">45 Channels (New)</option>
-            <option value="custom">Load Custom JSON...</option>
+            <option value="preset/2d_channel/preset_49ch.json" data-cn="49 通道 (标准)" data-en="49 Channels (Standard)">49 通道 (标准)</option>
+            <option value="preset/2d_channel/preset_45ch.json" data-cn="45 通道 (新增)" data-en="45 Channels (New)">45 通道 (新增)</option>
+            <option value="custom" data-cn="加载自定义 JSON..." data-en="Load Custom JSON...">加载自定义 JSON...</option>
         </select>
+        
         <div id="custom-upload-area" style="display:none; margin-top:5px; border:1px dashed #555; padding:5px;">
             <input type="file" id="config-upload" accept=".json" onchange="handleConfigUpload(this)">
         </div>
-        <h3>Display Options</h3>
+        
+        <h3 data-cn="显示选项" data-en="Display Options">显示选项</h3>
         <label class="checkbox-row" title="Feature in development">
-            <input type="checkbox" disabled> <span style="color:#666">Brain Region Display (Soon)</span>
+            <input type="checkbox" disabled> 
+            <span style="color:#666" data-cn="脑区显示 (开发中)" data-en="Brain Region Display (Soon)">脑区显示 (开发中)</span>
         </label>
-        <label>Channel Quality (.csv)</label>
+        
+        <label data-cn="通道信号质量 (.csv)" data-en="Channel Quality (.csv)">通道信号质量 (.csv)</label>
         <input type="file" id="sci-upload" accept=".csv, .txt" onchange="window.handleSCIUpload(this)">
-        <button onclick="window.clearSCI()" style="margin-top:5px; background:#555;">Clear Quality Data</button>
+        <button onclick="window.clearSCI()" style="margin-top:5px; background:#555;" data-cn="清除质量数据" data-en="Clear Quality Data">清除质量数据</button>
+        
         <div class="divider"></div>
-        <button onclick="window.resetZoom()">Recenter View</button>
+        <button onclick="window.resetZoom()" data-cn="重置视图居中" data-en="Recenter View">重置视图居中</button>
     </div>
 
-    <div class="orientation-label ori-top">Posterior (后)</div>
-    <div class="orientation-label ori-bottom"><span>Right (右)</span><span>Anterior (前)</span><span>Left (左)</span></div>
+    <div class="orientation-label ori-top" data-cn="Posterior (后)" data-en="Posterior">Posterior (后)</div>
+    <div class="orientation-label ori-bottom">
+        <span data-cn="Right (右)" data-en="Right">Right (右)</span>
+        <span data-cn="Anterior (前)" data-en="Anterior">Anterior (前)</span>
+        <span data-cn="Left (左)" data-en="Left">Left (左)</span>
+    </div>
 
     <div id="sci-legend">
-        <div style="font-weight:bold; margin-bottom:5px; color:#fff;">Signal Quality (SCI)</div>
-        <div class="legend-item"><div class="legend-color" style="background:#00b050;"></div> Excellent (≥ 0.6)</div>
-        <div class="legend-item"><div class="legend-color" style="background:#ffc000;"></div> Medium (0.3 - 0.6)</div>
-        <div class="legend-item"><div class="legend-color" style="background:#ff0000;"></div> Poor (< 0.3)</div>
+        <div style="font-weight:bold; margin-bottom:5px; color:#fff;" data-cn="信号质量 (SCI)" data-en="Signal Quality (SCI)">信号质量 (SCI)</div>
+        <div class="legend-item"><div class="legend-color" style="background:#00b050;"></div> <span data-cn="优秀 (≥ 0.6)" data-en="Excellent (≥ 0.6)">优秀 (≥ 0.6)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:#ffc000;"></div> <span data-cn="中等 (0.3 - 0.6)" data-en="Medium (0.3 - 0.6)">中等 (0.3 - 0.6)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:#ff0000;"></div> <span data-cn="较差 (< 0.3)" data-en="Poor (< 0.3)">较差 (< 0.3)</span></div>
     </div>
 
     <svg id="viz" width="100%" height="100%"></svg>
@@ -109,11 +131,16 @@
             const getPos = (x, y) => ({ cx: offsetX + x * PX_PER_UNIT, cy: offsetY - y * PX_PER_UNIT });
 
             const linkGroup = g.selectAll(".link-group").data(links).enter().append("g").attr("class", "link-group")
-                .on("mouseover", function(e, d) { d3.select(this).select("line").classed("hover-effect", true); d3.select("#tooltip").style("display", "block").text(`Channel: ${d.label}`); })
+                .on("mouseover", function(e, d) { 
+                    d3.select(this).select("line").classed("hover-effect", true); 
+                    const lang = localStorage.getItem('lang') || 'cn';
+                    const prefix = lang === 'cn' ? '通道: ' : 'Channel: ';
+                    d3.select("#tooltip").style("display", "block").text(`${prefix}${d.label}`); 
+                })
                 .on("mouseout", function() { d3.select(this).select("line").classed("hover-effect", false); d3.select("#tooltip").style("display", "none"); })
                 .on("mousemove", function(e) { d3.select("#tooltip").style("left", (e.pageX + 15) + "px").style("top", (e.pageY - 15) + "px"); });
 
-            linkGroup.append("line").attr("class", "link")
+            linkGroup.append("line").attr("class", "link").attr("id", d => `link-${d.label}`)
                 .attr("x1", d => getPos(...d.source.split('_').map(Number)).cx).attr("y1", d => getPos(...d.source.split('_').map(Number)).cy)
                 .attr("x2", d => getPos(...d.target.split('_').map(Number)).cx).attr("y2", d => getPos(...d.target.split('_').map(Number)).cy);
 
@@ -143,8 +170,14 @@
                     const chNum = parseInt(chStr.replace(/[^0-9]/g, "")); const val = parseFloat(valStr);
                     if (!isNaN(chNum) && !isNaN(val)) sciData[chNum.toString()] = val;
                 });
-                if (Object.keys(sciData).length === 0) alert("Failed to parse valid SCI data.");
-                else { applyChannelQuality(sciData); document.getElementById('sci-legend').style.display = 'block'; }
+                
+                const lang = localStorage.getItem('lang') || 'cn';
+                if (Object.keys(sciData).length === 0) {
+                    alert(lang === 'cn' ? "解析失败！请检查 CSV 格式。" : "Parsing Failed. Check CSV format.");
+                } else { 
+                    applyChannelQuality(sciData); 
+                    document.getElementById('sci-legend').style.display = 'block'; 
+                }
             };
             reader.readAsText(file);
         }
@@ -169,26 +202,40 @@
 
         async function loadPreset(val) {
             const uploadArea = document.getElementById('custom-upload-area');
-            if (val === 'custom') { uploadArea.style.display = 'block'; g.selectAll("*").remove(); } 
-            else {
+            if (val === 'custom') { 
+                uploadArea.style.display = 'block'; g.selectAll("*").remove(); 
+            } else {
                 uploadArea.style.display = 'none';
                 try {
-                    const res = await fetch(`preset/2d_channel/${val}`);
+                    const res = await fetch(val);
                     if (!res.ok) throw new Error("Not found");
                     renderMap(await res.json());
-                } catch(e) { console.error(e); alert(`Failed to load ${val}.\nEnsure server is running.`); }
+                } catch(e) { 
+                    console.error(e); 
+                    const lang = localStorage.getItem('lang') || 'cn';
+                    alert(lang === 'cn' ? `无法加载文件：${val}\n请确认本地 Server 已开启且文件存在。` : `Failed to load ${val}.\nEnsure server is running and file exists.`); 
+                }
             }
         }
 
         window.handleConfigUpload = function(input) {
             const file = input.files[0]; if(!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) { try { renderMap(JSON.parse(e.target.result)); } catch(err) { alert("Invalid JSON format"); } };
+            reader.onload = function(e) { 
+                try { renderMap(JSON.parse(e.target.result)); } 
+                catch(err) { 
+                    const lang = localStorage.getItem('lang') || 'cn';
+                    alert(lang === 'cn' ? "JSON 格式无效" : "Invalid JSON format"); 
+                } 
+            };
             reader.readAsText(file);
         }
 
         window.resetZoom = function() { svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity); }
-        loadPreset('preset_49ch.json');
+        
+        // 获取下拉框当前的默认值进行加载
+        const defaultMap = document.getElementById('map-selector').value;
+        loadPreset(defaultMap);
     </script>
 </body>
 </html>

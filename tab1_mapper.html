@@ -24,28 +24,42 @@
     <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
+    <script>
+        function applyLocalLang() {
+            const lang = localStorage.getItem('lang') || 'cn';
+            document.querySelectorAll('[data-cn]').forEach(el => {
+                el.innerText = el.getAttribute('data-' + lang);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', applyLocalLang);
+    </script>
+
     <div class="ui-panel">
-        <h2>🧠 fNIRS Mapper 3D</h2>
+        <h2 data-cn="🧠 fNIRS 3D 打点工具" data-en="🧠 fNIRS Mapper 3D">🧠 fNIRS Mapper 3D</h2>
         <div style="display:flex; gap:5px;">
-            <button id="btn-view" onclick="window.setMode('view')">View / Drag</button>
-            <button id="btn-add" onclick="window.setMode('add')">Add Marker</button>
+            <button id="btn-view" onclick="window.setMode('view')" data-cn="查看 / 拖拽" data-en="View / Drag">View / Drag</button>
+            <button id="btn-add" onclick="window.setMode('add')" data-cn="添加标记" data-en="Add Marker">Add Marker</button>
         </div>
-        <label>👁️ Visibility</label>
+        <label data-cn="👁️ 可见性" data-en="👁️ Visibility">👁️ Visibility</label>
         <div class="toggle-row">
-            <button id="btn-labels-ch" onclick="window.toggleChannelLabels()" class="toggle"># Channels: ON</button>
-            <button id="btn-labels-rg" onclick="window.toggleRegionLabels()" class="toggle">Abc Regions: ON</button>
+            <button id="btn-labels-ch" onclick="window.toggleChannelLabels()" class="toggle" data-cn="# 通道标签: 开" data-en="# Channels: ON"># Channels: ON</button>
+            <button id="btn-labels-rg" onclick="window.toggleRegionLabels()" class="toggle" data-cn="Abc 脑区标签: 开" data-en="Abc Regions: ON">Abc Regions: ON</button>
         </div>
         <div class="divider"></div>
-        <label>📂 1. Import/Export</label>
-        <button onclick="window.downloadMarkers()">⬇️ Save Markers</button>
+        <label data-cn="📂 1. 导入/导出" data-en="📂 1. Import/Export">📂 1. Import/Export</label>
+        <button onclick="window.downloadMarkers()" data-cn="⬇️ 保存标记" data-en="⬇️ Save Markers">⬇️ Save Markers</button>
         <input type="file" id="marker-import" accept=".json">
         <div class="divider"></div>
-        <label>🗺️ 2. Region Map</label>
+        <label data-cn="🗺️ 2. 脑区映射" data-en="🗺️ 2. Region Map">🗺️ 2. Region Map</label>
         <input type="file" id="json-upload" accept=".json">
-        <button onclick="window.generateRegions()">✨ Generate Surfaces</button>
-        <div id="log">Loading brain.glb...</div>
+        <button onclick="window.generateRegions()" data-cn="✨ 生成脑区曲面" data-en="✨ Generate Surfaces">✨ Generate Surfaces</button>
+        <div id="log" data-cn="正在加载脑模型..." data-en="Loading brain.glb...">Loading brain.glb...</div>
     </div>
-    <div id="context-menu"><div id="menu-edit">✏️ Edit ID</div><div id="menu-delete" style="color:#ff6b6b;">🗑️ Delete</div></div>
+    
+    <div id="context-menu">
+        <div id="menu-edit" data-cn="✏️ 编辑 ID" data-en="✏️ Edit ID">✏️ Edit ID</div>
+        <div id="menu-delete" style="color:#ff6b6b;" data-cn="🗑️ 删除" data-en="🗑️ Delete">🗑️ Delete</div>
+    </div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -57,10 +71,29 @@
         const COLORS=[0xff5555, 0x55ff55, 0x5555ff, 0xffff55, 0x55ffff, 0xff55ff];
         let scene,camera,renderer,controls,brainModel,raycaster,mouse,markers=[],regions=[],nextMarkerId=1,currentMode='view',selectedMarker=null,loadedChannelMap=null,showChannelLabels=true,showRegionLabels=true,isDragging=false,draggedMarker=null;
 
+        const getLang = () => localStorage.getItem('lang') || 'cn';
+
         window.setMode=m=>{currentMode=m;document.getElementById('btn-view').className=m==='view'?'active':'';document.getElementById('btn-add').className=m==='add'?'primary':'';};
-        window.toggleChannelLabels=()=>{showChannelLabels=!showChannelLabels; const b=document.getElementById('btn-labels-ch'); b.innerText=showChannelLabels?"# Channels: ON":"# Channels: OFF"; b.classList.toggle('off',!showChannelLabels); markers.forEach(m=>{if(m.sprite)m.sprite.visible=showChannelLabels})};
-        window.toggleRegionLabels=()=>{showRegionLabels=!showRegionLabels; const b=document.getElementById('btn-labels-rg'); b.innerText=showRegionLabels?"Abc Regions: ON":"Abc Regions: OFF"; b.classList.toggle('off',!showRegionLabels); regions.forEach(r=>{if(r.labelSprite)r.labelSprite.visible=showRegionLabels})};
-        window.downloadMarkers=()=>{if(!markers.length)return alert("Empty"); const d=markers.map(m=>({id:m.id,pos:m.object.position,norm:m.normal})); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(d)],{type:"json"})); a.download="markers.json"; a.click();};
+        
+        window.toggleChannelLabels=()=>{
+            showChannelLabels=!showChannelLabels; 
+            const b=document.getElementById('btn-labels-ch'); 
+            const l=getLang();
+            b.innerText=showChannelLabels ? (l==='cn'?"# 通道标签: 开":"# Channels: ON") : (l==='cn'?"# 通道标签: 关":"# Channels: OFF"); 
+            b.classList.toggle('off',!showChannelLabels); 
+            markers.forEach(m=>{if(m.sprite)m.sprite.visible=showChannelLabels})
+        };
+        
+        window.toggleRegionLabels=()=>{
+            showRegionLabels=!showRegionLabels; 
+            const b=document.getElementById('btn-labels-rg'); 
+            const l=getLang();
+            b.innerText=showRegionLabels ? (l==='cn'?"Abc 脑区标签: 开":"Abc Regions: ON") : (l==='cn'?"Abc 脑区标签: 关":"Abc Regions: OFF"); 
+            b.classList.toggle('off',!showRegionLabels); 
+            regions.forEach(r=>{if(r.labelSprite)r.labelSprite.visible=showRegionLabels})
+        };
+
+        window.downloadMarkers=()=>{if(!markers.length)return alert(getLang()==='cn'?"没有可保存的标记":"No markers to export."); const d=markers.map(m=>({id:m.id,pos:m.object.position,norm:m.normal})); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(d)],{type:"json"})); a.download="markers.json"; a.click();};
         window.generateRegions=generateRegions;
 
         init(); animate();
@@ -83,8 +116,8 @@
                 brainModel.scale.set(scale,scale,scale);
                 brainModel.position.sub(new THREE.Box3().setFromObject(brainModel).getCenter(new THREE.Vector3()));
                 brainModel.traverse(c=>{if(c.isMesh)c.material=new THREE.MeshStandardMaterial({color:0xe0e0e0,roughness:0.5,metalness:0.1})});
-                scene.add(brainModel); log("Brain Loaded.");
-            },undefined,e=>log("Error: brain.glb not found"));
+                scene.add(brainModel); log(getLang()==='cn'?"脑模型加载完成。":"Brain Loaded.");
+            },undefined,e=>log(getLang()==='cn'?"错误: 找不到 brain.glb":"Error: brain.glb not found"));
 
             window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth,window.innerHeight);});
             const cvs=renderer.domElement;
@@ -142,7 +175,7 @@
             sp.scale.set((s/2)*(w/128),s/2,1); sp.renderOrder=999; return sp;
         }
         function generateRegions(){
-            if(!loadedChannelMap)return alert("No Map");
+            if(!loadedChannelMap)return alert(getLang()==='cn'?"请先上传脑区映射 JSON 文件":"Upload Map JSON first");
             regions.forEach(r=>{scene.remove(r.mesh);if(r.labelSprite)scene.remove(r.labelSprite)}); regions=[];
             let idx=0;
             for(const[name,ids]of Object.entries(loadedChannelMap)){
@@ -171,11 +204,11 @@
                 }catch(e){}
             }
         }
-        function handleChannelMapUpload(e){const r=new FileReader();r.onload=ev=>{try{loadedChannelMap=JSON.parse(ev.target.result);log("Map Loaded.");}catch{alert("Bad JSON")}};r.readAsText(e.target.files[0]);}
-        function handleMarkerImport(e){const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);markers.forEach(m=>scene.remove(m.object));markers=[];let mx=0;d.forEach(x=>{markers.push(createMarker(new THREE.Vector3(x.pos.x,x.pos.y,x.pos.z),new THREE.Vector3(x.norm.x,x.norm.y,x.norm.z),x.id));if(x.id>mx)mx=x.id;});nextMarkerId=mx+1;log("Imported.");}catch{alert("Bad JSON")}};r.readAsText(e.target.files[0]);}
+        function handleChannelMapUpload(e){const r=new FileReader();r.onload=ev=>{try{loadedChannelMap=JSON.parse(ev.target.result);log(getLang()==='cn'?"映射加载成功。":"Map Loaded.");}catch{alert(getLang()==='cn'?"JSON格式无效":"Bad JSON")}};r.readAsText(e.target.files[0]);}
+        function handleMarkerImport(e){const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);markers.forEach(m=>scene.remove(m.object));markers=[];let mx=0;d.forEach(x=>{markers.push(createMarker(new THREE.Vector3(x.pos.x,x.pos.y,x.pos.z),new THREE.Vector3(x.norm.x,x.norm.y,x.norm.z),x.id));if(x.id>mx)mx=x.id;});nextMarkerId=mx+1;log(getLang()==='cn'?"导入成功。":"Imported.");}catch{alert(getLang()==='cn'?"JSON格式无效":"Bad JSON")}};r.readAsText(e.target.files[0]);}
         function openCtx(x,y,h){selectedMarker=h;const m=document.getElementById('context-menu');m.style.display='block';m.style.left=x+'px';m.style.top=y+'px';}
         document.getElementById('menu-delete').onclick=()=>{if(selectedMarker){scene.remove(selectedMarker.object);markers=markers.filter(m=>m!==selectedMarker);document.getElementById('context-menu').style.display='none';if(regions.length)generateRegions();}};
-        document.getElementById('menu-edit').onclick=()=>{if(selectedMarker){const id=prompt("ID:",selectedMarker.id);if(id){selectedMarker.id=parseInt(id);selectedMarker.object.remove(selectedMarker.object.children[1]);const s=createTextSprite(id,TEXT_SIZE,'#ffffff');s.position.y=MARKER_RADIUS+2.5;s.visible=showChannelLabels;selectedMarker.object.add(s);selectedMarker.sprite=s;}document.getElementById('context-menu').style.display='none';}};
+        document.getElementById('menu-edit').onclick=()=>{if(selectedMarker){const id=prompt(getLang()==='cn'?"新 ID:":"New ID:",selectedMarker.id);if(id){selectedMarker.id=parseInt(id);selectedMarker.object.remove(selectedMarker.object.children[1]);const s=createTextSprite(id,TEXT_SIZE,'#ffffff');s.position.y=MARKER_RADIUS+2.5;s.visible=showChannelLabels;selectedMarker.object.add(s);selectedMarker.sprite=s;}document.getElementById('context-menu').style.display='none';}};
         function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}
         function log(m){document.getElementById('log').textContent=m;}
     </script>
