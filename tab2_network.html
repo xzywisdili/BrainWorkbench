@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #1a1a1a; color: white; }
+        .ui-panel { position: absolute; top: 20px; left: 20px; background: rgba(30, 30, 30, 0.95); padding: 15px; border-radius: 8px; width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #444; max-height: 85vh; overflow-y: auto; pointer-events: auto; }
+        .ui-panel h2 { margin: 0 0 10px 0; font-size: 16px; color: #4db8ff; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .ui-panel h3 { margin: 15px 0 5px 0; font-size: 13px; color: #aaa; border-bottom: 1px dashed #555; padding-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
+        .ui-panel label { display: block; margin-bottom: 4px; font-size: 12px; color: #ccc; margin-top: 5px; }
+        .ui-panel button { width: 100%; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 5px; background: #444; color: #ddd; transition: 0.2s; font-size: 12px; }
+        .ui-panel button:hover { background: #555; }
+        .ui-panel input[type="file"], .ui-panel select { font-size: 11px; margin-bottom: 5px; color: #fff; width: 100%; background: #222; border: 1px solid #555; padding: 5px; border-radius: 4px; }
+        .checkbox-row { display: flex; align-items: center; margin-bottom: 5px; cursor: pointer; }
+        .checkbox-row input { margin-right: 8px; cursor: pointer; }
+        .checkbox-row span { font-size: 12px; }
+        .divider { border-top: 1px solid #444; margin: 15px 0; }
+        
+        .link { stroke: #444; stroke-width: 14px; stroke-linecap: round; transition: stroke 0.2s; }
+        .link.hover-effect { stroke: #fff !important; cursor: pointer; }
+        .ch-box { fill: #333; stroke: #555; stroke-width: 1.5px; rx: 3px; ry: 3px; transition: fill 0.3s; }
+        .ch-text { font-size: 14px; font-weight: bold; fill: #eee; text-anchor: middle; dominant-baseline: middle; pointer-events: none; font-family: Arial, sans-serif; }
+        .ch-text.dark { fill: #000 !important; }
+        .node circle { stroke-width: 2px; }
+        .node.source circle { fill: #ff4d4f; stroke: #a8071a; }
+        .node.detector circle { fill: #1890ff; stroke: #0050b3; }
+        .tooltip { position: absolute; background: rgba(0,0,0,0.9); border: 1px solid #444; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; display: none; z-index: 1000; }
+        .orientation-label { position: absolute; width: 100%; text-align: center; font-size: 14px; font-weight: bold; color: #666; letter-spacing: 2px; pointer-events: none; text-transform: uppercase; }
+        .ori-top { top: 20px; }
+        .ori-bottom { bottom: 20px; display: flex; justify-content: space-between; padding: 0 100px; box-sizing: border-box; }
+        
+        #sci-legend { position: absolute; bottom: 20px; left: 20px; background: rgba(30, 30, 30, 0.9); padding: 10px; border: 1px solid #444; border-radius: 6px; display: none; }
+        .legend-item { display: flex; align-items: center; font-size: 11px; margin-bottom: 4px; color: #ddd; }
+        .legend-color { width: 12px; height: 12px; margin-right: 8px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div class="ui-panel">
+        <h2>🗺️ Channel Map 2D</h2>
+        <h3>Base Map</h3>
+        <select id="map-selector" onchange="loadPreset(this.value)">
+            <option value="preset_49ch.json">49 Channels (Standard)</option>
+            <option value="preset_45ch.json">45 Channels (New)</option>
+            <option value="custom">Load Custom JSON...</option>
+        </select>
+        <div id="custom-upload-area" style="display:none; margin-top:5px; border:1px dashed #555; padding:5px;">
+            <input type="file" id="config-upload" accept=".json" onchange="handleConfigUpload(this)">
+        </div>
+        <h3>Display Options</h3>
+        <label class="checkbox-row" title="Feature in development">
+            <input type="checkbox" disabled> <span style="color:#666">Brain Region Display (Soon)</span>
+        </label>
+        <label>Channel Quality (.csv)</label>
+        <input type="file" id="sci-upload" accept=".csv, .txt" onchange="window.handleSCIUpload(this)">
+        <button onclick="window.clearSCI()" style="margin-top:5px; background:#555;">Clear Quality Data</button>
+        <div class="divider"></div>
+        <button onclick="window.resetZoom()">Recenter View</button>
+    </div>
+
+    <div class="orientation-label ori-top">Posterior (后)</div>
+    <div class="orientation-label ori-bottom"><span>Right (右)</span><span>Anterior (前)</span><span>Left (左)</span></div>
+
+    <div id="sci-legend">
+        <div style="font-weight:bold; margin-bottom:5px; color:#fff;">Signal Quality (SCI)</div>
+        <div class="legend-item"><div class="legend-color" style="background:#00b050;"></div> Excellent (≥ 0.6)</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ffc000;"></div> Medium (0.3 - 0.6)</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ff0000;"></div> Poor (< 0.3)</div>
+    </div>
+
+    <svg id="viz" width="100%" height="100%"></svg>
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        const zoom = d3.zoom().scaleExtent([0.5, 3]).on("zoom", (e) => d3.select("#viz g").attr("transform", e.transform));
+        const svg = d3.select("#viz");
+        const g = svg.append("g");
+        svg.call(zoom);
+
+        function renderMap(data) {
+            g.selectAll("*").remove(); d3.select("#tooltip").style("display", "none");
+            if(!data) return; 
+            const PX_PER_UNIT = 70; const NODE_R = 9;
+            const nodes = []; const links = []; let autoChCount = 1;
+
+            data.gridMap.forEach((rowStr, y) => {
+                for (let x = 0; x < rowStr.length; x++) {
+                    if (rowStr[x] === '1') {
+                        const type = (x + y) % 2 === 0 ? 'source' : 'detector';
+                        nodes.push({ id: `${x}_${y}`, x: x, y: y, type: type });
+                        if (x + 1 < rowStr.length && rowStr[x+1] === '1') {
+                            const key = `${x}_${y}_h`; const label = data.channelNumberMap[key] || String(autoChCount++);
+                            links.push({ source: `${x}_${y}`, target: `${x+1}_${y}`, label: label });
+                        }
+                        if (y + 1 < data.gridMap.length) {
+                            const nextRow = data.gridMap[y+1];
+                            if (x < nextRow.length && nextRow[x] === '1') {
+                                const key = `${x}_${y}_v`; const label = data.channelNumberMap[key] || String(autoChCount++);
+                                links.push({ source: `${x}_${y}`, target: `${x}_${y+1}`, label: label });
+                            }
+                        }
+                    }
+                }
+            });
+
+            const width = window.innerWidth; const height = window.innerHeight;
+            const mapWidth = data.gridMap[0].length * PX_PER_UNIT; const mapHeight = data.gridMap.length * PX_PER_UNIT;
+            const offsetX = (width - mapWidth) / 2 + 100; const offsetY = (height + mapHeight) / 2 - 100; 
+            const getPos = (x, y) => ({ cx: offsetX + x * PX_PER_UNIT, cy: offsetY - y * PX_PER_UNIT });
+
+            const linkGroup = g.selectAll(".link-group").data(links).enter().append("g").attr("class", "link-group")
+                .on("mouseover", function(e, d) { d3.select(this).select("line").classed("hover-effect", true); d3.select("#tooltip").style("display", "block").text(`Channel: ${d.label}`); })
+                .on("mouseout", function() { d3.select(this).select("line").classed("hover-effect", false); d3.select("#tooltip").style("display", "none"); })
+                .on("mousemove", function(e) { d3.select("#tooltip").style("left", (e.pageX + 15) + "px").style("top", (e.pageY - 15) + "px"); });
+
+            linkGroup.append("line").attr("class", "link")
+                .attr("x1", d => getPos(...d.source.split('_').map(Number)).cx).attr("y1", d => getPos(...d.source.split('_').map(Number)).cy)
+                .attr("x2", d => getPos(...d.target.split('_').map(Number)).cx).attr("y2", d => getPos(...d.target.split('_').map(Number)).cy);
+
+            const labelG = linkGroup.append("g");
+            labelG.each(function(d) {
+                const p1 = getPos(...d.source.split('_').map(Number)); const p2 = getPos(...d.target.split('_').map(Number));
+                const midX = (p1.cx + p2.cx) / 2; const midY = (p1.cy + p2.cy) / 2;
+                d3.select(this).append("rect").attr("class", "ch-box").attr("width", 26).attr("height", 18).attr("x", midX-13).attr("y", midY-9);
+                d3.select(this).append("text").attr("class", "ch-text").attr("x", midX).attr("y", midY+1).text(d.label);
+            });
+
+            const nodeGroup = g.selectAll(".node").data(nodes).enter().append("g").attr("class", d => `node ${d.type}`)
+                .attr("transform", d => { const p = getPos(d.x, d.y); return `translate(${p.cx}, ${p.cy})`; });
+            nodeGroup.append("circle").attr("r", NODE_R);
+        }
+
+        window.handleSCIUpload = function(input) {
+            const file = input.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r\n|\n/); const sciData = {}; 
+                lines.forEach(line => {
+                    line = line.trim(); if (!line) return;
+                    const parts = line.split(','); let chStr = "", valStr = "";
+                    if (parts[0] && parts[0].toUpperCase().indexOf("CH") > -1) { chStr = parts[0]; valStr = parts[1]; } 
+                    else if (parts.length > 2 && parts[1] && parts[1].toUpperCase().indexOf("CH") > -1) { chStr = parts[1]; valStr = parts[2]; }
+                    const chNum = parseInt(chStr.replace(/[^0-9]/g, "")); const val = parseFloat(valStr);
+                    if (!isNaN(chNum) && !isNaN(val)) sciData[chNum.toString()] = val;
+                });
+                if (Object.keys(sciData).length === 0) alert("Failed to parse valid SCI data.");
+                else { applyChannelQuality(sciData); document.getElementById('sci-legend').style.display = 'block'; }
+            };
+            reader.readAsText(file);
+        }
+
+        window.clearSCI = function() {
+            document.getElementById('sci-upload').value = "";
+            d3.selectAll('.link').style('stroke', '#444').style('stroke-opacity', 1);
+            document.getElementById('sci-legend').style.display = 'none';
+        }
+
+        function applyChannelQuality(sciData) {
+            d3.selectAll('.link').style('stroke', '#444').style('stroke-opacity', 1);
+            d3.selectAll('.link').each(function(d) {
+                const mapChKey = String(parseInt(d.label));
+                if (sciData.hasOwnProperty(mapChKey)) {
+                    const val = sciData[mapChKey]; let color = '#444';
+                    if (val >= 0.6) color = '#00b050'; else if (val >= 0.3) color = '#ffc000'; else color = '#ff0000';
+                    d3.select(this).style('stroke', color).style('stroke-opacity', 0.9);
+                }
+            });
+        }
+
+        async function loadPreset(val) {
+            const uploadArea = document.getElementById('custom-upload-area');
+            if (val === 'custom') { uploadArea.style.display = 'block'; g.selectAll("*").remove(); } 
+            else {
+                uploadArea.style.display = 'none';
+                try {
+                    const res = await fetch(`preset/2d_channel/${val}`);
+                    if (!res.ok) throw new Error("Not found");
+                    renderMap(await res.json());
+                } catch(e) { console.error(e); alert(`Failed to load ${val}.\nEnsure server is running.`); }
+            }
+        }
+
+        window.handleConfigUpload = function(input) {
+            const file = input.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) { try { renderMap(JSON.parse(e.target.result)); } catch(err) { alert("Invalid JSON format"); } };
+            reader.readAsText(file);
+        }
+
+        window.resetZoom = function() { svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity); }
+        loadPreset('preset_49ch.json');
+    </script>
+</body>
+</html>

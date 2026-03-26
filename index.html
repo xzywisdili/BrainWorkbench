@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>fNIRS Integrated Workbench</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Segoe UI', sans-serif; }
+        
+        /* 导航栏样式 */
+        #navbar {
+            position: fixed; top: 0; left: 0; width: 100%; height: 50px;
+            background: #222; border-bottom: 1px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .tab-btn {
+            background: transparent; border: none; color: #888;
+            padding: 0 20px; height: 100%; font-size: 15px; font-weight: bold;
+            cursor: pointer; transition: 0.3s; border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover { color: #ddd; }
+        .tab-btn.active { color: #4db8ff; border-bottom: 3px solid #4db8ff; }
+
+        /* iframe 容器 */
+        #content-frame {
+            position: absolute; top: 50px; left: 0;
+            width: 100%; height: calc(100vh - 50px);
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar">
+        <button class="tab-btn active" onclick="loadTab('tab1_mapper.html', this)">Tab 1: fNIRS Mapper 3D</button>
+        <button class="tab-btn" onclick="loadTab('tab2_network.html', this)">Tab 2: Channel Map 2D</button>
+        <button class="tab-btn" style="color: #ff9ee5;" onclick="loadTab('tab3_surface.html', this)">Tab 3: Brain Surface</button>
+    </div>
+
+    <iframe id="content-frame" src="tab1_mapper.html"></iframe>
+
+    <script>
+        function loadTab(url, btnElement) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            document.getElementById('content-frame').src = url;
+        }
+    </script>
+</body>
+</html>
